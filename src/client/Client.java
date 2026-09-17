@@ -154,6 +154,55 @@ public class Client {
             String user = line.substring("USER_LEFT|".length()).trim();
             peerMap.remove(user);
             if (mainFrame != null) mainFrame.onUserLeft(user);
+        } else if (line.startsWith("P2P_RELAY_MSG|")) {
+            // P2P_RELAY_MSG|sender|content
+            String[] parts = line.split("\\|", 3);
+            if (parts.length >= 3 && mainFrame != null) {
+                String sender = parts[1];
+                String content = parts[2].replace("\\|", "|");
+                mainFrame.onMessageReceived(sender, content);
+            }
+        } else if (line.startsWith("P2P_RELAY_FILE_OFFER|")) {
+            // P2P_RELAY_FILE_OFFER|sender|fileId|filename|size
+            String[] parts = line.split("\\|", 5);
+            if (parts.length >= 5 && mainFrame != null) {
+                mainFrame.onFileOfferReceived(parts[1], parts[2], parts[3], Long.parseLong(parts[4]));
+            }
+        } else if (line.startsWith("P2P_RELAY_FILE_REQ|")) {
+            // P2P_RELAY_FILE_REQ|requester|fileId
+            String[] parts = line.split("\\|", 3);
+            if (parts.length >= 3 && mainFrame != null) {
+                mainFrame.onFileRequestReceived(parts[1], parts[2]);
+            }
+        } else if (line.startsWith("P2P_RELAY_FILE_START|")) {
+            // P2P_RELAY_FILE_START|sender|fileId|filename|size
+            String[] parts = line.split("\\|", 5);
+            if (parts.length >= 5) {
+                P2PServer.handleRelayFileStart(parts[1], parts[2], parts[3], Long.parseLong(parts[4]), mainFrame);
+            }
+        } else if (line.startsWith("P2P_RELAY_FILE_CHUNK|")) {
+            // P2P_RELAY_FILE_CHUNK|sender|fileId|base64
+            String[] parts = line.split("\\|", 4);
+            if (parts.length >= 4) {
+                P2PServer.handleRelayFileChunk(parts[1], parts[2], parts[3], mainFrame);
+            }
+        } else if (line.startsWith("P2P_RELAY_FILE_DONE|")) {
+            // P2P_RELAY_FILE_DONE|sender|fileId|filename
+            String[] parts = line.split("\\|", 4);
+            if (parts.length >= 4) {
+                P2PServer.handleRelayFileDone(parts[1], parts[2], parts[3], mainFrame);
+            }
+        } else if (line.startsWith("P2P_RELAY_FILE_REJECT|")) {
+            String[] parts = line.split("\\|", 3);
+            if (parts.length >= 3 && mainFrame != null) {
+                mainFrame.onFileRejectReceived(parts[1], parts[2]);
+            }
+        }
+    }
+
+    public void sendRelay(String cmd) {
+        if (connected && writer != null) {
+            writer.println(cmd);
         }
     }
 
@@ -175,7 +224,7 @@ public class Client {
     public P2PConnection getPeerConnection(String peerUsername) {
         String[] info = peerMap.get(peerUsername);
         if (info == null) return null;
-        return new P2PConnection(peerUsername, info[0], Integer.parseInt(info[1]));
+        return new P2PConnection(peerUsername, info[0], Integer.parseInt(info[1]), this);
     }
 
     /** Danh sách peer hiện tại (không gồm bản thân). */

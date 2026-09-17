@@ -19,12 +19,62 @@ public class P2PServer implements Runnable {
     private static final String DOWNLOAD_DIR = "downloads";
     private static final java.util.Map<String, File> pendingDownloads = new java.util.concurrent.ConcurrentHashMap<>();
 
+    private static final java.util.Map<String, FileOutputStream> activeTransfers = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<String, Long> transferSizes = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<String, Long> transferReceived = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<String, String> transferFiles = new java.util.concurrent.ConcurrentHashMap<>();
+
     public static void registerPendingDownload(String fileId, File targetFile) {
         pendingDownloads.put(fileId, targetFile);
     }
 
     public static File getPendingDownload(String fileId) {
         return pendingDownloads.get(fileId);
+    }
+
+    public static void handleRelayFileStart(String sender, String fileId, String filename, long size, MainFrame frame) {
+        try {
+            File target = pendingDownloads.remove(fileId);
+            if (target == null) target = new File(DOWNLOAD_DIR, filename);
+            FileOutputStream fos = new FileOutputStream(target);
+            activeTransfers.put(fileId, fos);
+            transferSizes.put(fileId, size);
+            transferReceived.put(fileId, 0L);
+            transferFiles.put(fileId, target.getAbsolutePath());
+            if (frame != null) frame.onFileTransferStarted(sender, filename, size);
+        } catch (Exception e) {
+            System.err.println("[P2PServer] Lỗi bắt đầu nhận file relay: " + e.getMessage());
+        }
+    }
+
+    public static void handleRelayFileChunk(String sender, String fileId, String base64, MainFrame frame) {
+        try {
+            FileOutputStream fos = activeTransfers.get(fileId);
+            if (fos != null) {
+                byte[] data = Base64.getDecoder().decode(base64);
+                fos.write(data);
+                long rec = transferReceived.compute(fileId, (k, v) -> (v == null ? 0L : v) + data.length);
+                Long size = transferSizes.get(fileId);
+                if (frame != null && size != null && size > 0) {
+                    frame.onFileTransferProgress(sender, fileId, (int)(rec * 100 / size));
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[P2PServer] Lỗi ghi chunk relay: " + e.getMessage());
+        }
+    }
+
+    public static void handleRelayFileDone(String sender, String fileId, String filename, MainFrame frame) {
+        try {
+            FileOutputStream fos = activeTransfers.remove(fileId);
+            transferSizes.remove(fileId);
+            transferReceived.remove(fileId);
+            String path = transferFiles.remove(fileId);
+            if (fos != null) fos.close();
+            if (frame != null) frame.onFileTransferDone(sender, filename, path);
+        } catch (Exception e) {
+            System.err.println("[P2PServer] Lỗi kết thúc file relay: " + e.getMessage());
+        }
     }
 
     public P2PServer(int port, MainFrame mainFrame) {

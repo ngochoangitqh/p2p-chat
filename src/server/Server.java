@@ -120,7 +120,12 @@ public class Server {
         }
 
         String getClientIp() {
-            return socket.getInetAddress().getHostAddress();
+            String ip = socket.getInetAddress().getHostAddress();
+            if (ip.equals("127.0.0.1") || ip.equals("0:0:0:0:0:0:0:1") || socket.getInetAddress().isLoopbackAddress()) {
+                String lanIp = getLocalLanIp();
+                if (lanIp != null) return lanIp;
+            }
+            return ip;
         }
 
         int getP2pPort() {
@@ -197,6 +202,55 @@ public class Server {
                     send("USERS|" + getOnlineUsersString(username));
                     break;
 
+                case "RELAY_MSG":
+                    if (parts.length >= 3) {
+                        String target = parts[1];
+                        String content = parts[2];
+                        ClientHandler th = onlineUsers.get(target);
+                        if (th != null) th.send("P2P_RELAY_MSG|" + username + "|" + content);
+                    }
+                    break;
+
+                case "RELAY_FILE_OFFER":
+                    if (parts.length >= 5) {
+                        String target = parts[1];
+                        ClientHandler th = onlineUsers.get(target);
+                        if (th != null) th.send("P2P_RELAY_FILE_OFFER|" + username + "|" + parts[2] + "|" + parts[3] + "|" + parts[4]);
+                    }
+                    break;
+
+                case "RELAY_FILE_REQ":
+                    if (parts.length >= 3) {
+                        String target = parts[1];
+                        ClientHandler th = onlineUsers.get(target);
+                        if (th != null) th.send("P2P_RELAY_FILE_REQ|" + username + "|" + parts[2]);
+                    }
+                    break;
+
+                case "RELAY_FILE_CHUNK":
+                    if (parts.length >= 6) {
+                        String target = parts[1];
+                        ClientHandler th = onlineUsers.get(target);
+                        if (th != null) th.send("P2P_RELAY_FILE_CHUNK|" + username + "|" + parts[2] + "|" + parts[3] + "|" + parts[4] + "|" + parts[5]);
+                    }
+                    break;
+
+                case "RELAY_FILE_DONE":
+                    if (parts.length >= 4) {
+                        String target = parts[1];
+                        ClientHandler th = onlineUsers.get(target);
+                        if (th != null) th.send("P2P_RELAY_FILE_DONE|" + username + "|" + parts[2] + "|" + parts[3]);
+                    }
+                    break;
+
+                case "RELAY_FILE_REJECT":
+                    if (parts.length >= 3) {
+                        String target = parts[1];
+                        ClientHandler th = onlineUsers.get(target);
+                        if (th != null) th.send("P2P_RELAY_FILE_REJECT|" + username + "|" + parts[2]);
+                    }
+                    break;
+
                 case "LOGOUT":
                     cleanup();
                     send("OK|Đã đăng xuất");
@@ -215,6 +269,24 @@ public class Server {
             }
             try { socket.close(); } catch (IOException ignored) {}
         }
+    }
+
+    static String getLocalLanIp() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface ni = interfaces.nextElement();
+                if (ni.isLoopback() || !ni.isUp()) continue;
+                Enumeration<InetAddress> addresses = ni.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 
     private static void printServerIPs() {
