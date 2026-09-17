@@ -33,6 +33,8 @@ public class Server {
     public static void main(String[] args) throws IOException {
         System.out.println("=== P2P Chat Server ===");
         System.out.println("Đang lắng nghe trên port " + PORT + "...");
+        printServerIPs();
+        System.out.println("---------------------------------------------");
 
         ServerSocket serverSocket = new ServerSocket(PORT);
         // Cho phép tái sử dụng port ngay sau khi server tắt
@@ -213,5 +215,23 @@ public class Server {
             }
             try { socket.close(); } catch (IOException ignored) {}
         }
+    }
+
+    private static void printServerIPs() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            System.out.println("[IP Server] Địa chỉ IP máy của bạn để bạn bè kết nối:");
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface ni = interfaces.nextElement();
+                if (ni.isLoopback() || !ni.isUp()) continue;
+                Enumeration<InetAddress> addresses = ni.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (addr instanceof Inet4Address) {
+                        System.out.println("   -> " + addr.getHostAddress() + "  (" + ni.getDisplayName() + ")");
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
     }
 }
