@@ -1,0 +1,15 @@
+# Bytecode & build output
+out/
+*.class
+
+# Dữ liệu cục bộ / test
+users.dat
+history_*.dat
+downloads/
+
+# IDE & OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
